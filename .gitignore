@@ -1,7 +1,56 @@
-.env
-*.pyc
+# Byte-compiled / optimized / DLL files
 __pycache__/
+*.pyc
+*.pyo
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Test and tooling caches
 .pytest_cache/
-reports/
+.coverage
+.coverage.*
+.cache
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+
+# Virtual environments and local secrets
+.env
+.envrc
+.venv/
+venv/
+env/
+ENV/
+
+# Editor and notebook artifacts
+.ipynb_checkpoints/
+tempCodeRunnerFile.py
+
+# Project runtime data
 logs/
+reports/
 data/
+
+# Streamlit secrets
+.streamlit/secrets.toml
