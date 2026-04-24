@@ -23,6 +23,7 @@ def generate_report(result: dict, client_name: str = "Demo Client") -> Path:
 {datetime.now().isoformat()}
 
 ## Result
+**Mode:** {result.get("mode", "relaxed")}  
 **Injection detected:** {analysis["injection_detected"]}  
 **Severity:** {analysis["severity"]}  
 **Action taken:** {analysis["action_taken"]}

@@ -12,6 +12,7 @@ class FirewallRequest(BaseModel):
     user_instruction: str
     untrusted_content: str
     source_type: str = "web_content"
+    mode: str = "strict"
     client_name: str = "Demo Client"
     generate_report: bool = False
 
@@ -31,6 +32,7 @@ def firewall_endpoint(req: FirewallRequest):
         user_instruction=req.user_instruction,
         untrusted_content=req.untrusted_content,
         untrusted_source_type=req.source_type,
+        mode=req.mode,
     )
 
     report_path = None
@@ -39,6 +41,7 @@ def firewall_endpoint(req: FirewallRequest):
 
     return {
         "safe_output": result["safe_output"],
+        "mode": result["mode"],
         "security_analysis": result["security_analysis"],
         "council_review": result["council_review"],
         "report_path": report_path,
