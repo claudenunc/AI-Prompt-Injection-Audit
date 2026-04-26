@@ -34,6 +34,8 @@ ATTACK_PRESETS = {
 
 if "last_result" not in st.session_state:
     st.session_state.last_result = None
+if "history_events" not in st.session_state:
+    st.session_state.history_events = []
 
 
 st.set_page_config(page_title="AI Firewall", layout="wide")
@@ -45,6 +47,7 @@ default_api_base = os.getenv(
     "https://ai-prompt-injection-firewall-api.onrender.com",
 )
 api_base_url = st.text_input("API Base URL", value=default_api_base).rstrip("/")
+history_limit = st.slider("History Items", min_value=5, max_value=25, value=10, step=5)
 
 preset_name = st.selectbox("Demo Preset", options=list(ATTACK_PRESETS.keys()))
 
@@ -92,6 +95,19 @@ if st.button("Check API Health"):
     except requests.RequestException as exc:
         st.error(f"Health check failed: {exc}")
 
+if st.button("Refresh History"):
+    try:
+        history_response = requests.get(
+            f"{api_base_url}/history",
+            params={"limit": history_limit},
+            timeout=20,
+        )
+        history_response.raise_for_status()
+        st.session_state.history_events = history_response.json()["events"]
+        st.success("History loaded.")
+    except requests.RequestException as exc:
+        st.error(f"History request failed: {exc}")
+
 if st.button("Run Firewall"):
     try:
         response = requests.post(
@@ -110,6 +126,16 @@ if st.button("Run Firewall"):
         response.raise_for_status()
         data = response.json()
         st.session_state.last_result = data
+        try:
+            history_response = requests.get(
+                f"{api_base_url}/history",
+                params={"limit": history_limit},
+                timeout=20,
+            )
+            history_response.raise_for_status()
+            st.session_state.history_events = history_response.json()["events"]
+        except requests.RequestException:
+            pass
 
         council_summary = data["council_review"]["council_summary"]
         st.subheader("Council Summary")
@@ -143,3 +169,13 @@ if st.session_state.last_result and st.session_state.last_result.get("report_con
         file_name=report_filename,
         mime="text/markdown",
     )
+
+st.subheader("Recent Audit History")
+if st.session_state.history_events:
+    st.dataframe(
+        st.session_state.history_events,
+        use_container_width=True,
+        hide_index=True,
+    )
+else:
+    st.info("No history loaded yet. Click Refresh History or run the firewall.")

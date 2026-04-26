@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from app.audit_logger import read_recent_events
 from app.firewall import run_firewall
 from app.report_generator import build_report_content, generate_report
 
@@ -23,6 +24,16 @@ def health_check():
         "status": "ok",
         "service": "AI Prompt Injection Firewall",
         "version": "0.1.0",
+    }
+
+
+@app.get("/history")
+def history_endpoint(limit: int = 10):
+    normalized_limit = max(1, min(limit, 100))
+    events = read_recent_events(normalized_limit)
+    return {
+        "count": len(events),
+        "events": events,
     }
 
 
