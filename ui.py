@@ -39,6 +39,8 @@ if "history_events" not in st.session_state:
     st.session_state.history_events = []
 if "session_report" not in st.session_state:
     st.session_state.session_report = None
+if "approval_items" not in st.session_state:
+    st.session_state.approval_items = []
 
 
 st.set_page_config(page_title="AI Firewall", layout="wide")
@@ -85,9 +87,61 @@ def fetch_history(base_url: str, limit: int):
     return response.json()
 
 
-def export_session(base_url: str, limit: int):
+def get_auth_headers():
     effective_api_key = api_key or configured_api_key
-    headers = {"X-API-Key": effective_api_key} if effective_api_key else {}
+    return {"X-API-Key": effective_api_key} if effective_api_key else {}
+
+
+def fetch_approvals(base_url: str, status: str = "pending", limit: int = 50):
+    response = requests.get(
+        f"{base_url}/approvals",
+        params={"status": status, "limit": limit},
+        headers=get_auth_headers(),
+        timeout=20,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def queue_last_result(base_url: str):
+    data = st.session_state.last_result
+    council_summary = data["council_review"]["council_summary"]
+    response = requests.post(
+        f"{base_url}/approvals",
+        json={
+            "client_name": client_name,
+            "user_instruction": user_instruction,
+            "source_type": source_type,
+            "mode": data["mode"],
+            "severity": data["security_analysis"]["severity"],
+            "decision": council_summary["decision"],
+            "average_confidence": council_summary["average_confidence"],
+            "safe_output": data["safe_output"],
+            "reason": data["security_analysis"]["reason"],
+        },
+        headers=get_auth_headers(),
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def resolve_approval(base_url: str, approval_id: str, status: str, reviewer: str, notes: str):
+    response = requests.post(
+        f"{base_url}/approvals/{approval_id}/resolve",
+        json={
+            "status": status,
+            "reviewer": reviewer,
+            "resolution_notes": notes,
+        },
+        headers=get_auth_headers(),
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def export_session(base_url: str, limit: int):
     response = requests.post(
         f"{base_url}/session/export",
         json={
@@ -95,7 +149,7 @@ def export_session(base_url: str, limit: int):
             "session_title": session_title,
             "limit": limit,
         },
-        headers=headers,
+        headers=get_auth_headers(),
         timeout=30,
     )
     response.raise_for_status()
@@ -178,10 +232,15 @@ if st.button("Refresh History"):
     except requests.RequestException as exc:
         st.error(f"History request failed: {exc}")
 
+if st.button("Refresh Approval Queue"):
+    try:
+        st.session_state.approval_items = fetch_approvals(api_base_url)
+        st.success("Approval queue loaded.")
+    except requests.RequestException as exc:
+        st.error(f"Approval queue request failed: {exc}")
+
 if st.button("Run Firewall"):
     try:
-        effective_api_key = api_key or configured_api_key
-        headers = {"X-API-Key": effective_api_key} if effective_api_key else {}
         response = requests.post(
             f"{api_base_url}/firewall",
             json={
@@ -192,7 +251,7 @@ if st.button("Run Firewall"):
                 "generate_report": True,
                 "client_name": client_name,
             },
-            headers=headers,
+            headers=get_auth_headers(),
             timeout=30,
         )
 
@@ -220,6 +279,14 @@ if st.session_state.last_result and st.session_state.last_result.get("report_con
         file_name=report_filename,
         mime="text/markdown",
     )
+
+if st.session_state.last_result and st.button("Add Last Result To Approval Queue"):
+    try:
+        queue_item = queue_last_result(api_base_url)
+        st.success(f"Queued for review: {queue_item['approval_id']}")
+        st.session_state.approval_items = fetch_approvals(api_base_url)
+    except requests.RequestException as exc:
+        st.error(f"Failed to queue approval item: {exc}")
 
 if st.button("Export Full Audit Session"):
     try:
@@ -249,3 +316,30 @@ if st.session_state.history_events:
     )
 else:
     st.info("No history loaded yet. Click Refresh History or run the firewall.")
+
+st.subheader("Approval Queue")
+if st.session_state.approval_items:
+    approval_df = pd.DataFrame(st.session_state.approval_items)
+    st.dataframe(approval_df, use_container_width=True, hide_index=True)
+
+    approval_ids = [item["approval_id"] for item in st.session_state.approval_items]
+    selected_approval_id = st.selectbox("Approval Item", options=approval_ids)
+    reviewer_name = st.text_input("Reviewer", value="Team Reviewer")
+    resolution_notes = st.text_area("Resolution Notes", height=80)
+    resolution_action = st.selectbox("Resolution Action", options=["approved", "rejected"])
+
+    if st.button("Resolve Approval Item"):
+        try:
+            resolve_approval(
+                api_base_url,
+                selected_approval_id,
+                resolution_action,
+                reviewer_name,
+                resolution_notes,
+            )
+            st.success(f"Approval item {selected_approval_id} marked {resolution_action}.")
+            st.session_state.approval_items = fetch_approvals(api_base_url)
+        except requests.RequestException as exc:
+            st.error(f"Failed to resolve approval item: {exc}")
+else:
+    st.info("No approval items loaded yet. Click Refresh Approval Queue or queue a result.")

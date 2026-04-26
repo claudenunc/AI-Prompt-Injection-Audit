@@ -1,8 +1,9 @@
 import os
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 
+from app.approval_queue import create_approval_item, list_approval_items, resolve_approval_item
 from app.audit_logger import read_recent_events, read_recent_log_entries
 from app.firewall import run_firewall
 from app.report_generator import (
@@ -31,6 +32,24 @@ class SessionExportRequest(BaseModel):
     client_name: str = "Demo Client"
     session_title: str = "Audit Session"
     limit: int = 20
+
+
+class ApprovalQueueRequest(BaseModel):
+    client_name: str = "Demo Client"
+    user_instruction: str
+    source_type: str
+    mode: str
+    severity: str
+    decision: str
+    average_confidence: float | None = None
+    safe_output: str
+    reason: str = ""
+
+
+class ApprovalResolutionRequest(BaseModel):
+    status: str
+    reviewer: str
+    resolution_notes: str = ""
 
 
 @app.get("/health")
@@ -63,6 +82,52 @@ def session_export_endpoint(req: SessionExportRequest, _: None = Depends(require
         "report_content": report_content,
         "report_filename": report_filename,
     }
+
+
+@app.get("/approvals")
+def approvals_endpoint(
+    status: str = "pending",
+    limit: int = 50,
+    _: None = Depends(require_api_key),
+):
+    normalized_limit = max(1, min(limit, 100))
+    normalized_status = None if status == "all" else status
+    return list_approval_items(normalized_status, normalized_limit)
+
+
+@app.post("/approvals")
+def create_approval_endpoint(req: ApprovalQueueRequest, _: None = Depends(require_api_key)):
+    item = create_approval_item(
+        client_name=req.client_name,
+        source_type=req.source_type,
+        mode=req.mode,
+        severity=req.severity,
+        decision=req.decision,
+        average_confidence=req.average_confidence,
+        user_instruction=req.user_instruction,
+        safe_output=req.safe_output,
+        reason=req.reason,
+    )
+    return item
+
+
+@app.post("/approvals/{approval_id}/resolve")
+def resolve_approval_endpoint(
+    approval_id: str,
+    req: ApprovalResolutionRequest,
+    _: None = Depends(require_api_key),
+):
+    try:
+        return resolve_approval_item(
+            approval_id=approval_id,
+            status=req.status,
+            reviewer=req.reviewer,
+            resolution_notes=req.resolution_notes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/firewall")

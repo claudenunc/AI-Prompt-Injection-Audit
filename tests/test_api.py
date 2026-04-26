@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
+import app.approval_queue as approval_queue
 import app.audit_logger as audit_logger
 import app.security as security
 from app.api import app
@@ -199,3 +200,48 @@ def test_session_export_returns_markdown_report(monkeypatch):
     assert "Weekly Audit" in payload["report_content"]
     assert "Run count:** 2" in payload["report_content"]
     assert "Top Recurring Patterns" in payload["report_content"]
+
+
+def test_approval_queue_create_list_and_resolve(monkeypatch):
+    test_queue_file = Path("data") / f"test_approval_queue_{uuid4().hex}.jsonl"
+    monkeypatch.setattr(approval_queue, "APPROVAL_QUEUE_FILE", test_queue_file)
+    security.reset_rate_limit_state()
+
+    create_response = client.post(
+        "/approvals",
+        json={
+            "client_name": "Queue Test",
+            "user_instruction": "Summarize safely.",
+            "source_type": "email_content",
+            "mode": "strict",
+            "severity": "high",
+            "decision": "blocked",
+            "average_confidence": 0.92,
+            "safe_output": "[BLOCKED] Prompt injection detected. Content was not processed.",
+            "reason": "Prompt injection detected.",
+        },
+    )
+
+    assert create_response.status_code == 200
+    created = create_response.json()
+    assert created["status"] == "pending"
+    approval_id = created["approval_id"]
+
+    list_response = client.get("/approvals?status=pending&limit=10")
+    assert list_response.status_code == 200
+    items = list_response.json()
+    assert len(items) == 1
+    assert items[0]["approval_id"] == approval_id
+
+    resolve_response = client.post(
+        f"/approvals/{approval_id}/resolve",
+        json={
+            "status": "approved",
+            "reviewer": "Ops Lead",
+            "resolution_notes": "Approved for follow-up.",
+        },
+    )
+    assert resolve_response.status_code == 200
+    resolved = resolve_response.json()
+    assert resolved["status"] == "approved"
+    assert resolved["reviewer"] == "Ops Lead"

@@ -6,7 +6,12 @@ from fastapi import Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 
-PROTECTED_PATHS = {"/firewall", "/history"}
+PROTECTED_PATHS = {
+    "/firewall",
+    "/history",
+    "/session/export",
+    "/approvals",
+}
 RATE_LIMIT_STATE: dict[str, list[float]] = {}
 RATE_LIMIT_LOCK = threading.Lock()
 
