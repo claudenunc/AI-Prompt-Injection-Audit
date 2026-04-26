@@ -90,6 +90,15 @@ Author
 
 Nathan Ray Michel
 
+## Roadmap
+
+- Next: export/download report
+- Next: history panel
+- Next: auth and rate limiting before public sharing
+- Hosted dashboard for teams to share an approval queue
+- v0.3: connectors for LangGraph / CrewAI / AutoGen so it drops in
+- v0.4: enterprise compliance tier focused on AI auditing once v0.1 customers and audit data are in place
+
 
 ---
 

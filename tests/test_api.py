@@ -33,6 +33,8 @@ def test_firewall_endpoint_without_report():
     assert payload["council_review"]["council_summary"]["decision"] == "blocked"
     assert payload["safe_output"] == "[BLOCKED] Prompt injection detected. Content was not processed."
     assert payload["report_path"] is None
+    assert payload["report_content"] is None
+    assert payload["report_filename"] is None
 
 
 def test_firewall_endpoint_with_report():
@@ -54,3 +56,5 @@ def test_firewall_endpoint_with_report():
     assert payload["council_review"]["council_summary"]["average_confidence"] == 0.92
     assert payload["mode"] == "relaxed"
     assert payload["report_path"] is not None
+    assert payload["report_content"] is not None
+    assert payload["report_filename"].endswith(".md")

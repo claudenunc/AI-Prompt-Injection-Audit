@@ -32,6 +32,9 @@ ATTACK_PRESETS = {
     },
 }
 
+if "last_result" not in st.session_state:
+    st.session_state.last_result = None
+
 
 st.set_page_config(page_title="AI Firewall", layout="wide")
 
@@ -106,6 +109,7 @@ if st.button("Run Firewall"):
 
         response.raise_for_status()
         data = response.json()
+        st.session_state.last_result = data
 
         council_summary = data["council_review"]["council_summary"]
         st.subheader("Council Summary")
@@ -126,3 +130,16 @@ if st.button("Run Firewall"):
             st.success(f"Report saved: {data['report_path']}")
     except requests.RequestException as exc:
         st.error(f"Firewall request failed: {exc}")
+        st.session_state.last_result = None
+
+if st.session_state.last_result and st.session_state.last_result.get("report_content"):
+    report_filename = st.session_state.last_result.get(
+        "report_filename",
+        "prompt_injection_audit_report.md",
+    )
+    st.download_button(
+        "Download Audit Report",
+        data=st.session_state.last_result["report_content"],
+        file_name=report_filename,
+        mime="text/markdown",
+    )

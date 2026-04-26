@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from app.firewall import run_firewall
-from app.report_generator import generate_report
+from app.report_generator import build_report_content, generate_report
 
 
 app = FastAPI(title="AI Prompt Injection Firewall")
@@ -36,8 +36,12 @@ def firewall_endpoint(req: FirewallRequest):
     )
 
     report_path = None
+    report_content = None
+    report_filename = None
     if req.generate_report:
         report_path = str(generate_report(result, req.client_name))
+        report_content = build_report_content(result, req.client_name)
+        report_filename = report_path.split("/")[-1].split("\\")[-1]
 
     return {
         "safe_output": result["safe_output"],
@@ -45,4 +49,6 @@ def firewall_endpoint(req: FirewallRequest):
         "security_analysis": result["security_analysis"],
         "council_review": result["council_review"],
         "report_path": report_path,
+        "report_content": report_content,
+        "report_filename": report_filename,
     }
