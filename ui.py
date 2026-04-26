@@ -48,6 +48,11 @@ default_api_base = os.getenv(
     "https://ai-prompt-injection-firewall-api.onrender.com",
 )
 api_base_url = st.text_input("API Base URL", value=default_api_base).rstrip("/")
+api_key = st.text_input(
+    "API Key",
+    value=os.getenv("FIREWALL_API_KEY", ""),
+    type="password",
+)
 history_limit = st.slider("History Items", min_value=5, max_value=25, value=10, step=5)
 
 
@@ -60,9 +65,11 @@ def color_severity(value):
 
 
 def fetch_history(base_url: str, limit: int):
+    headers = {"X-API-Key": api_key} if api_key else {}
     response = requests.get(
         f"{base_url}/history",
         params={"limit": limit},
+        headers=headers,
         timeout=20,
     )
     response.raise_for_status()
@@ -147,6 +154,7 @@ if st.button("Refresh History"):
 
 if st.button("Run Firewall"):
     try:
+        headers = {"X-API-Key": api_key} if api_key else {}
         response = requests.post(
             f"{api_base_url}/firewall",
             json={
@@ -157,6 +165,7 @@ if st.button("Run Firewall"):
                 "generate_report": True,
                 "client_name": "Live Demo",
             },
+            headers=headers,
             timeout=30,
         )
 

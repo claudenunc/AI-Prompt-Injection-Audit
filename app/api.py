@@ -1,12 +1,16 @@
-from fastapi import FastAPI
+import os
+
+from fastapi import Depends, FastAPI
 from pydantic import BaseModel
 
 from app.audit_logger import read_recent_events
 from app.firewall import run_firewall
 from app.report_generator import build_report_content, generate_report
+from app.security import rate_limit_middleware, require_api_key
 
 
 app = FastAPI(title="AI Prompt Injection Firewall")
+app.middleware("http")(rate_limit_middleware)
 
 
 class FirewallRequest(BaseModel):
@@ -24,17 +28,18 @@ def health_check():
         "status": "ok",
         "service": "AI Prompt Injection Firewall",
         "version": "0.1.0",
+        "auth_enabled": bool(os.getenv("FIREWALL_API_KEY")),
     }
 
 
 @app.get("/history")
-def history_endpoint(limit: int = 10):
+def history_endpoint(limit: int = 10, _: None = Depends(require_api_key)):
     normalized_limit = max(1, min(limit, 100))
     return read_recent_events(normalized_limit)
 
 
 @app.post("/firewall")
-def firewall_endpoint(req: FirewallRequest):
+def firewall_endpoint(req: FirewallRequest, _: None = Depends(require_api_key)):
     result = run_firewall(
         user_instruction=req.user_instruction,
         untrusted_content=req.untrusted_content,

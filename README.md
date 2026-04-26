@@ -77,6 +77,21 @@ Health Check
 
 GET /health
 
+Protected endpoints:
+
+- `POST /firewall`
+- `GET /history`
+
+Optional API key auth:
+
+- Set `FIREWALL_API_KEY`
+- Send `X-API-Key: <your key>` on protected requests
+
+Rate limiting:
+
+- `RATE_LIMIT_REQUESTS` default: `30`
+- `RATE_LIMIT_WINDOW_SECONDS` default: `60`
+
 Tech Stack
 Python
 FastAPI
