@@ -69,3 +69,22 @@ def read_recent_events(limit: int = 20) -> list[dict]:
         )
 
     return list(reversed(structured))
+
+
+def read_recent_log_entries(limit: int = 20) -> list[dict]:
+    if limit < 1:
+        return []
+
+    if not LOG_FILE.exists():
+        return []
+
+    lines = LOG_FILE.read_text(encoding="utf-8").splitlines()
+    recent_lines = lines[-limit:]
+    entries = []
+
+    for line in recent_lines:
+        if not line.strip():
+            continue
+        entries.append(json.loads(line))
+
+    return list(reversed(entries))

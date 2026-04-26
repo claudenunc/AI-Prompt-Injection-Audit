@@ -37,6 +37,8 @@ if "last_result" not in st.session_state:
     st.session_state.last_result = None
 if "history_events" not in st.session_state:
     st.session_state.history_events = []
+if "session_report" not in st.session_state:
+    st.session_state.session_report = None
 
 
 st.set_page_config(page_title="AI Firewall", layout="wide")
@@ -55,6 +57,8 @@ api_key = st.text_input(
     type="password",
 )
 history_limit = st.slider("History Items", min_value=5, max_value=25, value=10, step=5)
+client_name = st.text_input("Client Name", value="Live Demo")
+session_title = st.text_input("Session Title", value="Prompt Injection Audit Session")
 
 if configured_api_key:
     st.caption("Server-side API authentication is configured for this UI.")
@@ -76,6 +80,23 @@ def fetch_history(base_url: str, limit: int):
         params={"limit": limit},
         headers=headers,
         timeout=20,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def export_session(base_url: str, limit: int):
+    effective_api_key = api_key or configured_api_key
+    headers = {"X-API-Key": effective_api_key} if effective_api_key else {}
+    response = requests.post(
+        f"{base_url}/session/export",
+        json={
+            "client_name": client_name,
+            "session_title": session_title,
+            "limit": limit,
+        },
+        headers=headers,
+        timeout=30,
     )
     response.raise_for_status()
     return response.json()
@@ -169,7 +190,7 @@ if st.button("Run Firewall"):
                 "source_type": source_type,
                 "mode": mode,
                 "generate_report": True,
-                "client_name": "Live Demo",
+                "client_name": client_name,
             },
             headers=headers,
             timeout=30,
@@ -197,6 +218,24 @@ if st.session_state.last_result and st.session_state.last_result.get("report_con
         "Download Audit Report",
         data=st.session_state.last_result["report_content"],
         file_name=report_filename,
+        mime="text/markdown",
+    )
+
+if st.button("Export Full Audit Session"):
+    try:
+        st.session_state.session_report = export_session(api_base_url, history_limit)
+        st.success(
+            f"Session report created: {st.session_state.session_report['report_path']}"
+        )
+    except requests.RequestException as exc:
+        st.error(f"Session export failed: {exc}")
+        st.session_state.session_report = None
+
+if st.session_state.session_report and st.session_state.session_report.get("report_content"):
+    st.download_button(
+        "Download Full Audit Session",
+        data=st.session_state.session_report["report_content"],
+        file_name=st.session_state.session_report["report_filename"],
         mime="text/markdown",
     )
 

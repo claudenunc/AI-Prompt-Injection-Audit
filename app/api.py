@@ -3,9 +3,14 @@ import os
 from fastapi import Depends, FastAPI
 from pydantic import BaseModel
 
-from app.audit_logger import read_recent_events
+from app.audit_logger import read_recent_events, read_recent_log_entries
 from app.firewall import run_firewall
-from app.report_generator import build_report_content, generate_report
+from app.report_generator import (
+    build_report_content,
+    build_session_report_content,
+    generate_report,
+    generate_session_report,
+)
 from app.security import rate_limit_middleware, require_api_key
 
 
@@ -22,6 +27,12 @@ class FirewallRequest(BaseModel):
     generate_report: bool = False
 
 
+class SessionExportRequest(BaseModel):
+    client_name: str = "Demo Client"
+    session_title: str = "Audit Session"
+    limit: int = 20
+
+
 @app.get("/health")
 def health_check():
     return {
@@ -36,6 +47,22 @@ def health_check():
 def history_endpoint(limit: int = 10, _: None = Depends(require_api_key)):
     normalized_limit = max(1, min(limit, 100))
     return read_recent_events(normalized_limit)
+
+
+@app.post("/session/export")
+def session_export_endpoint(req: SessionExportRequest, _: None = Depends(require_api_key)):
+    normalized_limit = max(1, min(req.limit, 100))
+    events = read_recent_log_entries(normalized_limit)
+    report_path = str(generate_session_report(events, req.client_name, req.session_title))
+    report_content = build_session_report_content(events, req.client_name, req.session_title)
+    report_filename = report_path.split("/")[-1].split("\\")[-1]
+
+    return {
+        "run_count": len(events),
+        "report_path": report_path,
+        "report_content": report_content,
+        "report_filename": report_filename,
+    }
 
 
 @app.post("/firewall")
