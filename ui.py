@@ -1,5 +1,6 @@
 import os
 
+import pandas as pd
 import requests
 import streamlit as st
 
@@ -49,6 +50,48 @@ default_api_base = os.getenv(
 api_base_url = st.text_input("API Base URL", value=default_api_base).rstrip("/")
 history_limit = st.slider("History Items", min_value=5, max_value=25, value=10, step=5)
 
+
+def color_severity(value):
+    if value == "high":
+        return "background-color: #f8d7da"
+    if value == "medium":
+        return "background-color: #fff3cd"
+    return "background-color: #d1e7dd"
+
+
+def fetch_history(base_url: str, limit: int):
+    response = requests.get(
+        f"{base_url}/history",
+        params={"limit": limit},
+        timeout=20,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def render_last_result():
+    if not st.session_state.last_result:
+        return
+
+    data = st.session_state.last_result
+    council_summary = data["council_review"]["council_summary"]
+    st.subheader("Council Summary")
+    st.json(council_summary)
+
+    st.caption(f"Policy mode: {data['mode']}")
+
+    st.subheader("Safe Output")
+    st.write(data["safe_output"])
+
+    st.subheader("Security Analysis")
+    st.json(data["security_analysis"])
+
+    st.subheader("Sibling Council Review")
+    st.json(data["council_review"])
+
+    if data["report_path"]:
+        st.success(f"Report saved: {data['report_path']}")
+
 preset_name = st.selectbox("Demo Preset", options=list(ATTACK_PRESETS.keys()))
 
 if "user_instruction" not in st.session_state:
@@ -97,13 +140,7 @@ if st.button("Check API Health"):
 
 if st.button("Refresh History"):
     try:
-        history_response = requests.get(
-            f"{api_base_url}/history",
-            params={"limit": history_limit},
-            timeout=20,
-        )
-        history_response.raise_for_status()
-        st.session_state.history_events = history_response.json()["events"]
+        st.session_state.history_events = fetch_history(api_base_url, history_limit)
         st.success("History loaded.")
     except requests.RequestException as exc:
         st.error(f"History request failed: {exc}")
@@ -127,36 +164,14 @@ if st.button("Run Firewall"):
         data = response.json()
         st.session_state.last_result = data
         try:
-            history_response = requests.get(
-                f"{api_base_url}/history",
-                params={"limit": history_limit},
-                timeout=20,
-            )
-            history_response.raise_for_status()
-            st.session_state.history_events = history_response.json()["events"]
+            st.session_state.history_events = fetch_history(api_base_url, history_limit)
         except requests.RequestException:
             pass
-
-        council_summary = data["council_review"]["council_summary"]
-        st.subheader("Council Summary")
-        st.json(council_summary)
-
-        st.caption(f"Policy mode: {data['mode']}")
-
-        st.subheader("Safe Output")
-        st.write(data["safe_output"])
-
-        st.subheader("Security Analysis")
-        st.json(data["security_analysis"])
-
-        st.subheader("Sibling Council Review")
-        st.json(data["council_review"])
-
-        if data["report_path"]:
-            st.success(f"Report saved: {data['report_path']}")
     except requests.RequestException as exc:
         st.error(f"Firewall request failed: {exc}")
         st.session_state.last_result = None
+
+render_last_result()
 
 if st.session_state.last_result and st.session_state.last_result.get("report_content"):
     report_filename = st.session_state.last_result.get(
@@ -172,8 +187,9 @@ if st.session_state.last_result and st.session_state.last_result.get("report_con
 
 st.subheader("Recent Audit History")
 if st.session_state.history_events:
+    history_df = pd.DataFrame(st.session_state.history_events)
     st.dataframe(
-        st.session_state.history_events,
+        history_df.style.applymap(color_severity, subset=["severity"]),
         use_container_width=True,
         hide_index=True,
     )

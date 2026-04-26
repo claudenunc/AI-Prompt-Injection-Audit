@@ -30,11 +30,7 @@ def health_check():
 @app.get("/history")
 def history_endpoint(limit: int = 10):
     normalized_limit = max(1, min(limit, 100))
-    events = read_recent_events(normalized_limit)
-    return {
-        "count": len(events),
-        "events": events,
-    }
+    return read_recent_events(normalized_limit)
 
 
 @app.post("/firewall")

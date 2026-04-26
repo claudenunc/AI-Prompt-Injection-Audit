@@ -91,10 +91,11 @@ def test_history_endpoint_returns_recent_events(monkeypatch):
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["count"] == 2
-    assert payload["events"][0]["mode"] == "relaxed"
-    assert payload["events"][0]["source_type"] == "web_content"
-    assert payload["events"][0]["decision"] == "approved"
-    assert payload["events"][1]["mode"] == "strict"
-    assert payload["events"][1]["severity"] == "high"
-    assert payload["events"][1]["decision"] == "blocked"
+    assert len(payload) == 2
+    assert payload[0]["mode"] == "relaxed"
+    assert payload[0]["source_type"] == "web_content"
+    assert payload[0]["decision"] == "approved"
+    assert payload[0]["average_confidence"] == 0.92
+    assert payload[1]["mode"] == "strict"
+    assert payload[1]["severity"] == "high"
+    assert payload[1]["decision"] == "blocked"
