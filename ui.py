@@ -47,13 +47,17 @@ default_api_base = os.getenv(
     "API_BASE_URL",
     "https://ai-prompt-injection-firewall-api.onrender.com",
 )
+configured_api_key = os.getenv("FIREWALL_API_KEY", "")
 api_base_url = st.text_input("API Base URL", value=default_api_base).rstrip("/")
 api_key = st.text_input(
-    "API Key",
-    value=os.getenv("FIREWALL_API_KEY", ""),
+    "API Key Override",
+    value="",
     type="password",
 )
 history_limit = st.slider("History Items", min_value=5, max_value=25, value=10, step=5)
+
+if configured_api_key:
+    st.caption("Server-side API authentication is configured for this UI.")
 
 
 def color_severity(value):
@@ -65,7 +69,8 @@ def color_severity(value):
 
 
 def fetch_history(base_url: str, limit: int):
-    headers = {"X-API-Key": api_key} if api_key else {}
+    effective_api_key = api_key or configured_api_key
+    headers = {"X-API-Key": effective_api_key} if effective_api_key else {}
     response = requests.get(
         f"{base_url}/history",
         params={"limit": limit},
@@ -154,7 +159,8 @@ if st.button("Refresh History"):
 
 if st.button("Run Firewall"):
     try:
-        headers = {"X-API-Key": api_key} if api_key else {}
+        effective_api_key = api_key or configured_api_key
+        headers = {"X-API-Key": effective_api_key} if effective_api_key else {}
         response = requests.post(
             f"{api_base_url}/firewall",
             json={
